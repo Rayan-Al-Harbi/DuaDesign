@@ -32,10 +32,12 @@ export function validateDua(dua: GeneratedDua): ValidationResult {
   if (/[a-zA-Z]{3,}/.test(dua.text)) errors.push("يحتوي على كلمات إنجليزية");
   if (countArabicChars(dua.text) < 20) errors.push("نص عربي غير كافٍ");
 
-  // Repetition is a quality signal, not a fault: a slightly repetitive dua is
-  // still worth showing, so it earns a retry rather than failing the request.
+  // Quality signals, not faults: each earns a retry rather than failing the
+  // request, because a flawed dua still beats an error page.
   const warnings: string[] = [];
   if (dua.text && isRepetitive(dua.text)) warnings.push("تكرار مفرط في النص");
+  if (dua.fabricatedQuotes > 0) warnings.push(`اقتباس غير موثّق (${dua.fabricatedQuotes})`);
+  if (dua.truncated) warnings.push("انقطع النص قبل تمامه");
 
   return { isValid: errors.length === 0, errors, warnings };
 }

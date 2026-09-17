@@ -44,6 +44,75 @@ export function countArabicChars(text: string): number {
   return (text.match(ARABIC_CHAR) || []).length;
 }
 
+// Clitics that attach to the front of an Arabic word, longest first.
+//
+// Verb prefixes (ي ت ن أ) are excluded because stripping them collides with
+// ordinary nouns; keyword lists carry verb forms explicitly instead. The
+// conjunctions و and ف are excluded for a sharper reason: they are part of
+// real words. Stripping them turned "والدين" into "دين", which then matched
+// "ديني" and retrieved parent duas for a wish about faith — and it split the
+// one word family four ways ("والد"→"الد" but "الوالدين"→"والد"), so the
+// over-stripping did not cancel out between the two sides of a comparison.
+const CLITIC_PREFIXES = ["بال", "كال", "لل", "ال", "ب", "ك", "ل"];
+
+// Pronoun and plural endings, longest first.
+const SUFFIXES = ["هما", "كما", "هم", "هن", "كم", "كن", "نا", "ها", "ات", "ون", "ين", "ان", "ه", "ك", "ي"];
+
+const MIN_STEM = 3;
+
+/**
+ * Strip one leading clitic and one trailing affix, leaving a crude stem.
+ *
+ * This is not a linguistic stemmer and does not try to be. It over-strips
+ * words that merely begin with a clitic ("كتاب" loses its ك), which is
+ * tolerable only as long as it over-strips every form of a word the same way —
+ * both sides of a comparison run through it, so a consistent error cancels
+ * out. An affix that fires on some forms of a word and not others does real
+ * damage, which is why the prefix list is as short as it is. It never strips
+ * below MIN_STEM characters, which keeps short keywords from matching
+ * everything.
+ */
+export function stemArabic(word: string): string {
+  let w = normalizeArabic(word);
+
+  for (const p of CLITIC_PREFIXES) {
+    if (w.startsWith(p) && w.length - p.length >= MIN_STEM) {
+      w = w.slice(p.length);
+      break;
+    }
+  }
+  for (const s of SUFFIXES) {
+    if (w.endsWith(s) && w.length - s.length >= MIN_STEM) {
+      w = w.slice(0, -s.length);
+      break;
+    }
+  }
+  return w;
+}
+
+/** Split text into normalized word tokens. */
+export function tokenize(text: string): string[] {
+  return normalizeArabic(text).split(" ").filter(Boolean);
+}
+
+/**
+ * Whether a word from the user's wish refers to the same thing as a keyword.
+ *
+ * Anchored at the start of the stem rather than searching anywhere inside it,
+ * so "المدينة" no longer matches "دين" and "الاختبارات" no longer matches
+ * "بار" — substring matching pulled debt duas into pilgrimage wishes and
+ * child-rearing duas into exam wishes.
+ */
+export function matchesKeyword(word: string, keyword: string): boolean {
+  const t = stemArabic(word);
+  const k = stemArabic(keyword);
+  if (!t || !k) return false;
+  if (t === k) return true;
+  if (t.startsWith(k) && t.length - k.length <= 2) return true;
+  if (k.startsWith(t) && k.length - t.length <= 2) return true;
+  return false;
+}
+
 /**
  * Split into comparable segments on both sentence enders and commas. Commas
  * count because the model often re-states a petition as a clause rather than a

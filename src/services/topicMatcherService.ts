@@ -1,88 +1,103 @@
 // ─────────────────────────────────────────────────────────────
 // Topic Matcher — Maps user wishes to dua knowledge categories
 //
-// Uses keyword matching to find relevant authentic dua references
-// for context injection into the LLM prompt.
+// Retrieves authentic dua references for context injection, grouped by the
+// wish each one serves so the prompt can tie them together.
 // ─────────────────────────────────────────────────────────────
 
 import { DUA_KNOWLEDGE_BASE, type DuaCategory, type DuaReference } from "@/data/duaKnowledgeBase";
+import { matchesKeyword, tokenize } from "@/lib/arabicText";
+
+/** Authentic references retrieved for one wish. */
+export interface WishContext {
+  wish: string;
+  categories: string[];
+  references: DuaReference[];
+}
 
 export interface MatchedContext {
-  /** All unique references matched across all wishes */
+  /** References grouped by the wish they were retrieved for. */
+  perWish: WishContext[];
+  /** Every retrieved reference, deduplicated — the set quoting is checked against. */
   references: DuaReference[];
-  /** Category IDs that were matched */
+  /** Category IDs that were matched. */
   matchedCategories: string[];
 }
 
-/**
- * Matches a single wish against all categories.
- * Returns matching categories sorted by relevance (keyword hit count).
- */
+// A small, focused context beats a large one on a 7B model: with fifteen
+// references it drifts between them instead of using any. These caps keep the
+// prompt tied to what the user actually asked for.
+const CATEGORIES_PER_WISH = 2;
+const REFERENCES_PER_WISH = 3;
+const GENERAL_REFERENCES = 2;
+
+/** Score categories for one wish by how many distinct keywords it hits. */
 function matchWish(wish: string): DuaCategory[] {
-  const normalizedWish = wish.toLowerCase().trim();
+  const words = tokenize(wish);
 
-  const scored = DUA_KNOWLEDGE_BASE
+  return DUA_KNOWLEDGE_BASE
     .filter((cat) => cat.keywords.length > 0) // skip "general"
-    .map((cat) => {
-      const hits = cat.keywords.filter((kw) =>
-        normalizedWish.includes(kw.toLowerCase())
-      ).length;
-      return { category: cat, hits };
-    })
+    .map((cat) => ({
+      category: cat,
+      hits: cat.keywords.filter((kw) => words.some((w) => matchesKeyword(w, kw))).length,
+    }))
     .filter((s) => s.hits > 0)
-    .sort((a, b) => b.hits - a.hits);
-
-  return scored.map((s) => s.category);
+    .sort((a, b) => b.hits - a.hits)
+    .slice(0, CATEGORIES_PER_WISH)
+    .map((s) => s.category);
 }
 
 /**
- * Matches all user wishes against the knowledge base.
- * Returns deduplicated, relevant dua references for context injection.
+ * Retrieve authentic references for every wish.
  *
- * Always includes "general" category references as a baseline.
- * Caps total references to avoid prompt bloat.
+ * General references are appended as a baseline so a wish that matches no
+ * category still has authentic wording to draw on.
  */
 export function matchTopics(wishes: string[]): MatchedContext {
-  const seenTexts = new Set<string>();
-  const references: DuaReference[] = [];
+  const seen = new Set<string>();
+  const perWish: WishContext[] = [];
+  const flat: DuaReference[] = [];
   const matchedCategoryIds = new Set<string>();
 
-  // Match each wish
+  const take = (ref: DuaReference): boolean => {
+    if (seen.has(ref.text)) return false;
+    seen.add(ref.text);
+    flat.push(ref);
+    return true;
+  };
+
   for (const wish of wishes) {
     const categories = matchWish(wish);
+    const references: DuaReference[] = [];
 
     for (const cat of categories) {
       matchedCategoryIds.add(cat.id);
-
       for (const ref of cat.references) {
-        if (!seenTexts.has(ref.text)) {
-          seenTexts.add(ref.text);
-          references.push(ref);
-        }
+        if (references.length >= REFERENCES_PER_WISH) break;
+        if (take(ref)) references.push(ref);
       }
     }
+
+    perWish.push({ wish, categories: categories.map((c) => c.id), references });
   }
 
-  // Always add general references
   const general = DUA_KNOWLEDGE_BASE.find((c) => c.id === "general");
+  const generalRefs: DuaReference[] = [];
   if (general) {
     for (const ref of general.references) {
-      if (!seenTexts.has(ref.text)) {
-        seenTexts.add(ref.text);
-        references.push(ref);
-      }
+      if (generalRefs.length >= GENERAL_REFERENCES) break;
+      if (take(ref)) generalRefs.push(ref);
     }
   }
 
-  // Cap at 15 references to keep prompt focused
-  const capped = references.slice(0, 15);
+  // A wish that matched nothing still needs wording to work from.
+  for (const entry of perWish) {
+    if (entry.references.length === 0) entry.references = generalRefs;
+  }
 
   console.log(
-    `[TopicMatcher] Matched ${matchedCategoryIds.size} categories, ${capped.length} references for ${wishes.length} wishes`
+    `[TopicMatcher] ${matchedCategoryIds.size} categories, ${flat.length} references for ${wishes.length} wishes`
   );
 
-  return {
-    references: capped,
-    matchedCategories: Array.from(matchedCategoryIds),
-  };
+  return { perWish, references: flat, matchedCategories: Array.from(matchedCategoryIds) };
 }

@@ -8,6 +8,10 @@ export interface GeneratedDua {
   text: string;
   matchedCategories: string[];
   referencesUsed: number;
+  /** Quoted spans that matched nothing in the retrieved corpus. */
+  fabricatedQuotes: number;
+  /** The model hit the token ceiling instead of finishing on its own. */
+  truncated: boolean;
 }
 
 export interface ApiResponse<T = GeneratedDua> {
