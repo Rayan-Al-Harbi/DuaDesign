@@ -1,6 +1,7 @@
 import type { LLMConfig, ValidatedInput, GeneratedDua } from "@/types/dua";
 import { matchTopics, type MatchedContext } from "@/services/topicMatcherService";
 import type { DuaReference } from "@/data/duaKnowledgeBase";
+import { normalizeArabic, splitSegments } from "@/lib/arabicText";
 
 function getConfig(): LLMConfig {
   // Deployment dashboards can accidentally introduce surrounding whitespace.
@@ -63,7 +64,7 @@ async function callLLM(systemPrompt: string, userMessage: string, config: LLMCon
         model: config.model,
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
         think: false, stream: false,
-        options: { temperature: 0.8, num_predict: 1024 },
+        options: { temperature: 0.85, num_predict: 1024, repeat_penalty: 1.15 },
       }),
     });
     if (!res.ok) throw new Error(`Ollama returned ${res.status}`);
@@ -77,10 +78,11 @@ async function callLLM(systemPrompt: string, userMessage: string, config: LLMCon
     body: JSON.stringify({
       model: config.model,
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-      // V4.1 Flash thinks by default. For a short dua, reserve the response
-      // budget for the generated text instead of hidden reasoning tokens.
-      ...(config.baseUrl.includes("api.deepseek.com") ? { reasoning_effort: "none" } : {}),
-      temperature: 0.6, max_tokens: 1024,
+      // ALLaM 2 7B is small enough to loop when it has budget left over: it
+      // re-states a petition, or restarts the dua from the top. Keep the
+      // temperature up and penalize repeats so it varies phrasing instead.
+      temperature: 0.85, max_tokens: 1024,
+      frequency_penalty: 0.4, presence_penalty: 0.3,
     }),
   });
 
@@ -94,7 +96,33 @@ async function callLLM(systemPrompt: string, userMessage: string, config: LLMCon
   return (data.choices?.[0]?.message?.content || "").trim();
 }
 
-function cleanResponse(raw: string): string {
+// Short refrains ("يا رب") are legitimately repeated in a dua; only segments
+// with real content are deduplicated.
+const MIN_DEDUPE_LENGTH = 15;
+
+/**
+ * Drop segments the model already emitted. Covers both failure modes seen with
+ * small models: a repeated petition, and the whole dua restarted from the top.
+ */
+function dedupeSegments(text: string): { text: string; removed: number } {
+  const seen = new Set<string>();
+  let removed = 0;
+
+  const paragraphs = text.split(/\n\s*\n/).map((para) => {
+    const kept = splitSegments(para).filter((seg) => {
+      const key = normalizeArabic(seg);
+      if (key.length < MIN_DEDUPE_LENGTH) return true;
+      if (seen.has(key)) { removed++; return false; }
+      seen.add(key);
+      return true;
+    });
+    return kept.join(" ");
+  });
+
+  return { text: paragraphs.filter(Boolean).join("\n\n").trim(), removed };
+}
+
+function cleanResponse(raw: string): { text: string; removed: number } {
   let text = raw;
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
   text = text.replace(/```[\s\S]*?```/g, "").trim();
@@ -102,7 +130,7 @@ function cleanResponse(raw: string): string {
   text = text.replace(/^#+\s.*/gm, "").trim();
   const lines = text.split("\n");
   const filtered = lines.filter((l) => { const t = l.trim(); return t.length === 0 || /[\u0600-\u06FF]/.test(t); });
-  return filtered.join("\n").trim();
+  return dedupeSegments(filtered.join("\n").trim());
 }
 
 export async function generateDua(input: ValidatedInput): Promise<GeneratedDua> {
@@ -114,7 +142,8 @@ export async function generateDua(input: ValidatedInput): Promise<GeneratedDua> 
   console.log(`[LLM] model=${config.model} refs=${context.references.length} cats=[${context.matchedCategories}]`);
 
   const raw = await callLLM(systemPrompt, userMessage, config);
-  const text = cleanResponse(raw);
+  const { text, removed } = cleanResponse(raw);
+  if (removed > 0) console.warn(`[LLM] stripped ${removed} duplicated segment(s) from ${config.model}`);
 
   if (text.length < 20) throw new Error("LLM returned insufficient content");
 
