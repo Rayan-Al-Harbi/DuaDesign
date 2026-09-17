@@ -99,10 +99,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "نص غير صالح" }, { status: 400 });
     }
 
-    const apiKey = process.env.LLM_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     // 1. Try Groq Orpheus first (higher quality Saudi voice)
-    if (apiKey && apiKey !== "ollama") {
+    if (apiKey) {
       console.log(`[TTS] Trying Groq Orpheus (${text.length} chars)`);
       const groqResult = await tryGroq(text, apiKey);
 

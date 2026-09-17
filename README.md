@@ -6,8 +6,8 @@
 
 ### Core
 - **RAG-Lite Context Injection** — 14 topic categories, 50+ authentic references from Hisn Al-Muslim, Sahih Bukhari/Muslim, Quran
-- **Flowing Arabic Generation** — Single-pass natural dua composition via Llama 4 Maverick on Groq
-- **Arabic Text-to-Speech** — Listen to your dua recited in authentic Saudi Arabic (Groq Orpheus), Hybrid with Edge TTS backup
+- **Flowing Arabic Generation** — Single-pass natural dua composition via DeepSeek V4.1 Flash
+- **Arabic Text-to-Speech** — Listen to your dua recited in authentic Saudi Arabic (optional Groq Orpheus), with Edge TTS backup
 
 ### User Experience
 - **Dua History** — Last 12 duas saved locally
@@ -34,11 +34,11 @@ User Input → Preprocessing → Topic Matcher → Knowledge Base Lookup
 ```bash
 npm install
 cp .env.example .env
-# Edit .env → add your Groq API key from https://console.groq.com/keys
+# Edit .env → add your DeepSeek API key from https://platform.deepseek.com/api_keys
 npm run dev
 ```
 
 
 ## 📁 Tech Stack
 
-Next.js 14 • TypeScript • React • Groq API • Llama 4 Maverick • TTS • RAG
+Next.js • TypeScript • React • DeepSeek V4.1 Flash • TTS • RAG
