@@ -99,7 +99,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: "نص غير صالح" }, { status: 400 });
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    // Reuse the Groq LLM key for TTS unless a dedicated key is configured.
+    const usesGroqLlm = process.env.LLM_BASE_URL?.trim().includes("api.groq.com");
+    const apiKey = process.env.GROQ_API_KEY || (usesGroqLlm ? process.env.LLM_API_KEY : undefined);
 
     // 1. Try Groq Orpheus first (higher quality Saudi voice)
     if (apiKey) {
