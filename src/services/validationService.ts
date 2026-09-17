@@ -31,6 +31,11 @@ export function validateDua(dua: GeneratedDua): ValidationResult {
   if (!dua.text || dua.text.trim().length < 30) errors.push("الدعاء قصير جداً");
   if (/[a-zA-Z]{3,}/.test(dua.text)) errors.push("يحتوي على كلمات إنجليزية");
   if (countArabicChars(dua.text) < 20) errors.push("نص عربي غير كافٍ");
-  if (dua.text && isRepetitive(dua.text)) errors.push("تكرار مفرط في النص");
-  return { isValid: errors.length === 0, errors };
+
+  // Repetition is a quality signal, not a fault: a slightly repetitive dua is
+  // still worth showing, so it earns a retry rather than failing the request.
+  const warnings: string[] = [];
+  if (dua.text && isRepetitive(dua.text)) warnings.push("تكرار مفرط في النص");
+
+  return { isValid: errors.length === 0, errors, warnings };
 }

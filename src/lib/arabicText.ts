@@ -16,6 +16,16 @@ const DIACRITICS = new RegExp(`[${cp(0x064b)}-${cp(0x0652)}${cp(0x0670)}${cp(0x0
 const NON_ARABIC = new RegExp(`[^${ARABIC_RANGE}\\s]`, "g");
 const ARABIC_CHAR = new RegExp(`[${ARABIC_RANGE}]`, "g");
 
+// Arabic punctuation sits inside the Arabic block, so NON_ARABIC leaves it
+// behind. Strip it separately, or the same sentence re-emitted with a comma
+// instead of a full stop reads as two different segments.
+// U+060C comma, U+061B semicolon, U+061F question mark, U+066A-U+066D
+// percent/decimal/thousands/star, U+06D4 full stop.
+const ARABIC_PUNCT = new RegExp(
+  `[${cp(0x060c)}${cp(0x061b)}${cp(0x061f)}${cp(0x066a)}-${cp(0x066d)}${cp(0x06d4)}]`,
+  "g"
+);
+
 /** Collapse an Arabic string to a form safe for equality comparison. */
 export function normalizeArabic(s: string): string {
   return s
@@ -23,7 +33,8 @@ export function normalizeArabic(s: string): string {
     .replace(/[أإآٱ]/g, "ا") // alef variants -> bare alef
     .replace(/ة/g, "ه") // taa marbuta -> haa
     .replace(/ى/g, "ي") // alef maqsura -> yaa
-    .replace(NON_ARABIC, " ") // drop punctuation, latin, emoji
+    .replace(ARABIC_PUNCT, " ")
+    .replace(NON_ARABIC, " ") // latin, emoji, western punctuation
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -34,19 +45,15 @@ export function countArabicChars(text: string): number {
 }
 
 /**
- * Split into comparable segments. Prefers sentence enders; falls back to commas
- * when the model returns one long run-on paragraph, so a duplicated block is
- * still detectable.
+ * Split into comparable segments on both sentence enders and commas. Commas
+ * count because the model often re-states a petition as a clause rather than a
+ * sentence, which a sentence-only split hides inside one segment. Splitting
+ * this finely is safe: segments are deduplicated only on exact equality after
+ * normalization, so clauses that merely resemble each other all survive.
  */
 export function splitSegments(text: string): string[] {
-  const bySentence = text
-    .split(/(?<=[.!؟؛])\s+|\n+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (bySentence.length >= 3) return bySentence;
-
   return text
-    .split(/(?<=[،,])\s+|\n+/)
+    .split(/(?<=[.!؟؛،,])\s+|\n+/)
     .map((s) => s.trim())
     .filter(Boolean);
 }

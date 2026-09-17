@@ -18,7 +18,10 @@ export interface ApiResponse<T = GeneratedDua> {
 
 export interface ValidationResult {
   isValid: boolean;
+  /** Faults that make the dua unusable. */
   errors: string[];
+  /** Quality problems worth another attempt, but not worth failing the request over. */
+  warnings: string[];
 }
 
 export interface PreprocessingResult {

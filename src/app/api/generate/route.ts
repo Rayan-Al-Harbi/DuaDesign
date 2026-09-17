@@ -28,9 +28,18 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse>>
     }
 
     let v = validateDua(dua);
-    if (!v.isValid) {
-      try { dua = await generateDua(pre.data); v = validateDua(dua); } catch { /* */ }
+    if (!v.isValid || v.warnings.length > 0) {
+      console.warn(`[Pipeline] Attempt 1 errors=[${v.errors}] warnings=[${v.warnings}]`);
+      try {
+        const retry = await generateDua(pre.data);
+        const rv = validateDua(retry);
+        // Take the retry only when it is genuinely better than what we have.
+        if (rv.isValid && (!v.isValid || rv.warnings.length === 0)) { dua = retry; v = rv; }
+      } catch (e) {
+        console.error("[Pipeline] Retry failed:", e);
+      }
       if (!v.isValid) {
+        console.error(`[Pipeline] Gave up, errors=[${v.errors}]`);
         return NextResponse.json({ success: false, error: "لم نتمكن من إنشاء دعاء مطابق للمعايير." }, { status: 500 });
       }
     }
