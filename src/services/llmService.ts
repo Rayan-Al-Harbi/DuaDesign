@@ -75,6 +75,9 @@ async function callLLM(systemPrompt: string, userMessage: string, config: LLMCon
     body: JSON.stringify({
       model: config.model,
       messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
+      // V4.1 Flash thinks by default. For a short dua, reserve the response
+      // budget for the generated text instead of hidden reasoning tokens.
+      ...(config.baseUrl.includes("api.deepseek.com") ? { reasoning_effort: "none" } : {}),
       temperature: 0.8, max_tokens: 1024,
     }),
   });
