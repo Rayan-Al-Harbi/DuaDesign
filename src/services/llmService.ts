@@ -3,9 +3,11 @@ import { matchTopics, type MatchedContext } from "@/services/topicMatcherService
 import type { DuaReference } from "@/data/duaKnowledgeBase";
 
 function getConfig(): LLMConfig {
-  const apiKey = process.env.LLM_API_KEY;
-  const baseUrl = process.env.LLM_BASE_URL;
-  const model = process.env.LLM_MODEL;
+  // Deployment dashboards can accidentally introduce surrounding whitespace.
+  // Normalize values here so it cannot produce malformed request URLs.
+  const apiKey = process.env.LLM_API_KEY?.trim();
+  const baseUrl = process.env.LLM_BASE_URL?.trim().replace(/\/+$/, "");
+  const model = process.env.LLM_MODEL?.trim();
   if (!apiKey || !baseUrl || !model) {
     throw new Error("Missing LLM config. Set LLM_API_KEY, LLM_BASE_URL, LLM_MODEL.");
   }
@@ -78,7 +80,7 @@ async function callLLM(systemPrompt: string, userMessage: string, config: LLMCon
       // V4.1 Flash thinks by default. For a short dua, reserve the response
       // budget for the generated text instead of hidden reasoning tokens.
       ...(config.baseUrl.includes("api.deepseek.com") ? { reasoning_effort: "none" } : {}),
-      temperature: 0.8, max_tokens: 1024,
+      temperature: 0.6, max_tokens: 1024,
     }),
   });
 
