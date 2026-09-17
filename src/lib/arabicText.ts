@@ -60,6 +60,12 @@ const SUFFIXES = ["هما", "كما", "هم", "هن", "كم", "كن", "نا", "�
 
 const MIN_STEM = 3;
 
+// The definite article strips down further than other affixes. Arabic has real
+// two-letter roots — حج, أم, أب — and holding them to MIN_STEM left "الحج"
+// unstripped, so a wish about Hajj matched no category at all.
+const MIN_STEM_AFTER_ARTICLE = 2;
+const ARTICLES = new Set(["ال", "بال", "كال", "لل"]);
+
 /**
  * Strip one leading clitic and one trailing affix, leaving a crude stem.
  *
@@ -76,7 +82,8 @@ export function stemArabic(word: string): string {
   let w = normalizeArabic(word);
 
   for (const p of CLITIC_PREFIXES) {
-    if (w.startsWith(p) && w.length - p.length >= MIN_STEM) {
+    const floor = ARTICLES.has(p) ? MIN_STEM_AFTER_ARTICLE : MIN_STEM;
+    if (w.startsWith(p) && w.length - p.length >= floor) {
       w = w.slice(p.length);
       break;
     }
@@ -108,6 +115,13 @@ export function matchesKeyword(word: string, keyword: string): boolean {
   const k = stemArabic(keyword);
   if (!t || !k) return false;
   if (t === k) return true;
+
+  // A two-letter stem must match exactly. Allowing it a couple of trailing
+  // characters made it match most of the lexicon: "أب" (father) stems to "اب"
+  // and swallowed the colloquial "ابغى" ("I want"), retrieving parent duas for
+  // any wish phrased in dialect.
+  if (k.length < MIN_STEM) return false;
+
   if (t.startsWith(k) && t.length - k.length <= 2) return true;
   if (k.startsWith(t) && k.length - t.length <= 2) return true;
   return false;

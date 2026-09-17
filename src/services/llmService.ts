@@ -26,7 +26,7 @@ function buildReferenceBlock(perWish: WishContext[]): string {
   return perWish
     .map((entry) => {
       const lines = entry.references.map((r) => `- ${r.text}`).join("\n");
-      return `## ${entry.wish}\n${lines}`;
+      return `الرغبة: ${entry.wish}\n${lines}`;
     })
     .join("\n\n");
 }
@@ -50,13 +50,15 @@ ${buildReferenceBlock(perWish)}
 - لكل رغبة جملتان إلى ثلاث، لا أكثر. عالج كل رغبة مرة واحدة ثم انتقل إلى التي تليها ولا تعد إليها.
 - استخدم من أسماء الله الحسنى ما يناسب كل رغبة: يا رزاق للرزق، يا شافي للشفاء، يا فتاح للفرج.
 - لا تكرر صيغة النداء نفسها أكثر من مرتين في الدعاء كله.
-- اكتب بالعربية الفصحى وحدها، نصاً متصلاً بلا عناوين ولا ترقيم ولا تنسيق.
+- لا تدعُ إلا بالرغبات المذكورة أعلاه وحدها. لا تضف موضوعاً لم يطلبه المستخدم مهما حسُن، ولا تسرد أبواب الدعاء سرداً.
+- اكتب نصاً متصلاً بالعربية الفصحى وحدها: بلا عناوين ولا أرقام ولا نقاط ولا قوائم.
 
 # البنية والطول
-1. تبدأ بحمد الله والثناء عليه في جملة أو جملتين.
-2. ثم الرغبات بالترتيب، لكل واحدة جملتان إلى ثلاث.
-3. ثم تختم بالصلاة على النبي ﷺ.
-الطول كله بين 120 و 180 كلمة، فقرتان على الأكثر. توقف فور انتهائك من الصلاة على النبي ﷺ ولا تكتب حرفاً بعدها.
+ابدأ بحمد الله والثناء عليه في جملة أو جملتين، ثم ادعُ لكل رغبة بجملتين أو ثلاث على ترتيب ورودها، ثم اختم بالصلاة على النبي ﷺ. الطول كله بين 120 و 180 كلمة في فقرة أو فقرتين. توقف فور انتهائك من الصلاة على النبي ﷺ ولا تكتب حرفاً بعدها.
+الرغبة الواحدة لا تُطيل الدعاء: إن كانت رغبة واحدة فالدعاء أقصر، ولا تملأ الفراغ بمواضيع أخرى.
+
+# نموذج للشكل والطول وحدهما — لا تنسخ ألفاظه ولا موضوعه
+الحمد لله رب العالمين، حمداً طيباً مباركاً فيه، لا إله إلا هو الكريم الوهاب، له الأسماء الحسنى والصفات العلى. اللهم إني أسألك علماً نافعاً ورزقاً طيباً وعملاً متقبلاً، ويسّر لي أمري واشرح لي صدري، واكتب لي التوفيق فيما أقدمت عليه، وسدّد خطاي إلى ما تحب وترضى. اللهم لا سهل إلا ما جعلته سهلاً، فسهّل عليّ ما استصعب من أمري، وارزقني الثبات عند الشدائد وحسن الظن بك عند كل بلاء. يا فتاح، افتح لي أبواب رحمتك، ويا رزاق، ابسط لي من فضلك، واجعل لي من كل ضيق مخرجاً ومن كل همٍّ فرجاً. اللهم ما قسمته لي فبارك لي فيه، وما صرفته عني فاجعله خيرة لي في ديني ودنياي. وصلِّ اللهم وسلم على نبينا محمد وعلى آله وصحبه أجمعين.
 
 # المخرج
 نص الدعاء وحده. لا شيء قبله ولا بعده.`;
@@ -72,10 +74,11 @@ interface LLMReply {
   truncated: boolean;
 }
 
-// A 180-word Arabic dua lands well inside this. The ceiling exists so a model
-// that starts looping is cut off rather than billed for a thousand tokens of
-// it; the truncation is then detected and trimmed to the last whole sentence.
-const MAX_OUTPUT_TOKENS = 700;
+// Sized to the 180-word target rather than generously above it. Headroom is
+// not free with this model: given budget it fills it, padding a single-wish
+// dua out to four hundred words. Overshoot is trimmed to the last whole
+// sentence, so a tight ceiling costs a clause and buys a dua that ends.
+const MAX_OUTPUT_TOKENS = 420;
 
 async function callLLM(systemPrompt: string, userMessage: string, config: LLMConfig): Promise<LLMReply> {
   const isOllama = config.baseUrl.includes("localhost:11434") || config.baseUrl.includes("127.0.0.1:11434");
@@ -107,7 +110,11 @@ async function callLLM(systemPrompt: string, userMessage: string, config: LLMCon
       // re-states a petition, or restarts the dua from the top. Keep the
       // temperature up and penalize repeats so it varies phrasing instead.
       temperature: 0.85, max_tokens: MAX_OUTPUT_TOKENS,
-      frequency_penalty: 0.4, presence_penalty: 0.3,
+      // frequency_penalty discourages reusing the same phrasing. presence_penalty
+      // is deliberately absent: it penalizes every token already seen, which
+      // pushed the model off the user's wish onto fresh subject matter -- a
+      // request for one wish came back as a numbered catalogue of thirteen.
+      frequency_penalty: 0.2,
     }),
   });
 

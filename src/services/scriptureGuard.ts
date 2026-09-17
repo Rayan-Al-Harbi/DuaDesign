@@ -45,6 +45,10 @@ const ATTRIBUTION_PHRASES = [
   "في كتابك العزيز",
   "في كتابك الكريم",
   "قال الله تعالى",
+  "أنت القائل في كتابك المنزل",
+  "أنت القائل في كتابك",
+  "في كتابك المنزل",
+  "أنت القائل",
   "في الحديث القدسي",
   "في الحديث الشريف",
   "قال رسول الله",
@@ -133,6 +137,11 @@ export function scanScripture(raw: string, references: DuaReference[]): Scriptur
     .replace(/[ \t]+([،.؛])/g, "$1")
     .replace(/([.؛])[ \t]*،/g, "$1")
     .replace(/،[ \t]*،/g, "،")
+    // Removing a quote after "أنت القائل:" leaves the colon introducing
+    // nothing. Collapse a doubled colon, then drop one left facing punctuation
+    // or the end of a line.
+    .replace(/:[ \t]*:/g, ":")
+    .replace(/[ \t]*:[ \t]*(?=[،.؛]|$)/gm, "")
     .replace(/^[ \t،:.]+/gm, "")
     .replace(/[ \t]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")

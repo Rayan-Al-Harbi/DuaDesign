@@ -5,8 +5,8 @@
 ## ✨ Features
 
 ### Core
-- **RAG-Lite Context Injection** — 14 topic categories, 50+ authentic references from Hisn Al-Muslim, Sahih Bukhari/Muslim, Quran
-- **Flowing Arabic Generation** — Single-pass natural dua composition via ALLaM 2 7B on Groq
+- **RAG Context Injection** — 14 topic categories, 50+ authentic references from Hisn Al-Muslim, Sahih Bukhari/Muslim, Quran. Retrieved wordings are prayed with verbatim, and anything the model presents as scripture is verified against them before it reaches the page.
+- **Flowing Arabic Generation** — Single-pass natural dua composition via Qwen 3.8 27B on Groq
 - **Arabic Text-to-Speech** — Listen to your dua recited in authentic Saudi Arabic (optional Groq Orpheus), with Edge TTS backup
 
 ### User Experience
@@ -41,4 +41,4 @@ npm run dev
 
 ## 📁 Tech Stack
 
-Next.js • TypeScript • React • Groq • ALLaM 2 7B • TTS • RAG
+Next.js • TypeScript • React • Groq • Qwen 3.8 27B • TTS • RAG

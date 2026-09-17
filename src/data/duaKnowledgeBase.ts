@@ -110,7 +110,10 @@ export const DUA_KNOWLEDGE_BASE: DuaCategory[] = [
     id: "distress",
     label: "تفريج الهم والكرب",
     keywords: [
-      "هم","غم","كرب","حزن","ضيق","قلق","اكتئاب","فرج","صبر",
+      // Two-letter keywords only ever match exactly, so the inflected and
+      // colloquial forms are listed rather than derived.
+      "هم","همي","هموم","غم","غمي","كرب","كربي","حزن","ضيق","قلق",
+      "اكتئاب","فرج","يفرج","افرج","فرّج","صبر",
       "راحة","سعادة","طمأنينة","أمل","يأس","وحدة",
     ],
     references: [
@@ -123,7 +126,13 @@ export const DUA_KNOWLEDGE_BASE: DuaCategory[] = [
   {
     id: "parents",
     label: "الوالدين والأهل",
-    keywords: ["والد","والدة","أب","أم","أهل","بر","والدين","أبوي","جد","جدة"],
+    // "أب" and "أم" are absent: a two-letter stem matches only exactly, so
+    // they caught nothing useful, and loosening the rule for them made "أب"
+    // swallow the colloquial "ابغى". The forms people actually type are listed.
+    keywords: [
+      "والد","والدة","والدين","والدتي","والدي","أمي","أبي","أبوي","امه","ابوه",
+      "أهل","بر","جد","جدة",
+    ],
     references: [
       { text: "رب ارحمهما كما ربياني صغيراً", source: "سورة الإسراء: 24" },
       { text: "ربنا اغفر لي ولوالديّ وللمؤمنين يوم يقوم الحساب", source: "سورة إبراهيم: 41" },
